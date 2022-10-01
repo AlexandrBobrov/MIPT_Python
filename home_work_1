@@ -1,0 +1,141 @@
+%%writefile always_rock.py
+#Всегда камень
+def always_rock(observation, configuration):
+    return 0
+    
+%%writefile always_paper.py
+#Всегда бумага
+def always_paper(observation, configuration):
+    return 1
+
+%%writefile always_scissors.py
+#Всегда ножницы
+def always_scissors(observation, configuration):
+    return 2
+    
+%%writefile copy_opponent.py
+#Копируем оппонента
+def copy_opponent(observation, configuration):
+    if observation.step > 0:
+        return observation.lastOpponentAction
+    else:
+        return 0
+        
+%%writefile statistical.py
+#Статистика
+#action_histogram = {}
+
+def statistical(observation, configuration):
+    global action_histogram
+    if observation.step == 0:
+        action_histogram = {}
+        return
+    action = observation.lastOpponentAction
+    if action not in action_histogram:
+        action_histogram[action] = 0
+    action_histogram[action] += 1
+    mode_action = None
+    mode_action_count = None
+    for k, v in action_histogram.items():
+        if mode_action_count is None or v > mode_action_count:
+            mode_action = k
+            mode_action_count = v
+            continue
+
+    return (mode_action + 1) % configuration.signs
+
+%%writefile uncopy_opponent.py
+#Бьем последний шаг оппонента
+def uncopy_opponent(observation, configuration):
+    if observation.step > 0:
+        if observation.lastOpponentAction == 0:
+            f = 1
+        elif observation.lastOpponentAction == 1:
+            f = 2
+        elif observation.lastOpponentAction == 2:
+            f = 0
+        return f
+    else:
+        return 0
+        
+%%writefile rundom.py
+#Случайный выбор
+def rundom(observation, configuration):
+    from random import randrange
+    return randrange(0, 2)
+    
+%%writefile unuse_opponent.py
+#Выбираем вариант не относящийся к проиграшному и выиграшному варианту предыдущего хода
+def unuse_opponent(observation, configuration):
+    if observation.step > 0:
+        if observation.lastOpponentAction == 0:
+            f = 2
+        elif observation.lastOpponentAction == 1:
+            f = 0
+        elif observation.lastOpponentAction == 2:
+            f = 1
+        return f
+    else:
+        return 0
+        
+
+!pip install -q -U kaggle_environments
+import numpy as np
+import pandas as pd
+import random
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from kaggle_environments import make, evaluate
+#Тк много времени потеряно на реализацию варианта без библиотеки kaggle, сделал всего 8 агентов.
+#Создадим два списка
+#В списке names храним имена для визуализации
+names  = ["always_rock", "always_paper", "always_scissors", "statistical", "copy_opponent", 
+               "uncopy_opponent", "rundom", "unuse_opponent"]
+
+#В списке agents храним функции агентов
+agents = ["always_rock.py", "always_paper.py", "always_scissors.py",
+               "statistical.py", "copy_opponent.py", "uncopy_opponent.py", "rundom.py", "unuse_opponent.py"]
+
+# матрица результатов
+# Инициализируем нулями с помощью метода zeros библиотеки numpy
+matr_res = np.zeros ((len(names), len(names)), dtype='int')
+
+# прогоняем бои в цикле
+for i_agents in range(len(agents)):
+    for j_agents in range(i_agents + 1, len(agents)):
+        last_react_action = None
+        last_counter_action = None
+        action_histogram = {}
+        
+        res = evaluate(
+           "rps", #environment to use - no need to change
+           [agents[i_agents], agents[j_agents]], #agents to evaluate
+            configuration={"episodeSteps": 100} #number of episodes 
+           )
+        matr_res[i_agents][j_agents] = res[0][0]
+        matr_res[j_agents][i_agents] = res[0][1]
+        
+import numpy as np
+import seaborn as sn
+import matplotlib.pyplot as plt
+  
+data = pd.DataFrame(
+   matr_res,
+   index=names,
+   columns=names,
+   )
+
+
+# setting the parameter values
+vmin = 10
+vmax = 90
+  
+# plotting the heatmap
+hm = sn.heatmap(data=data,
+                vmin=vmin,
+                vmax=vmax)
+  
+# displaying the plotted heatmap
+plt.show()
